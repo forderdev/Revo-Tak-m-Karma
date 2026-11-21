@@ -70,6 +70,18 @@
     return SLOT_BY_ID[f.slot] ? SLOT_BY_ID[f.slot].code : null;
   }
 
+  /* Tek takımda takım kilidi anlamsız: herkes zaten o takımda. Kayıtlı kilit silinmez, sadece yok sayılır. */
+  function forTeams(players, teamCount) {
+    if (teamCount !== 1) return players;
+    return players.map(function (p) {
+      if (p.lockTeam == null) return p;
+      var c = {};
+      for (var k in p) c[k] = p[k];
+      c.lockTeam = null;
+      return c;
+    });
+  }
+
   /* ---------- Takım ataması ---------- */
 
   function assignTeamsCore(players, settings, fixed, mode, rng) {
@@ -265,6 +277,7 @@
     rng = rng || Math.random;
     fixed = fixed || {};
     tries = tries || 60;
+    players = forTeams(players, settings.teamCount);
     if (players.length < settings.teamCount) return null;
     for (var i = 0; i < tries; i++) {
       var teamOf = assignTeams(players, settings, fixed, rng);
@@ -280,6 +293,7 @@
   function teamLabel(t, names) { return (names && names[t]) || ('Takım ' + (t + 1)); }
 
   function validate(players, settings, teamNames) {
+    players = forTeams(players, settings.teamCount);
     var T = settings.teamCount, N = players.length;
     var slots = slotsFor(settings), counts = codeCounts(slots), cap = slots.length;
     var res = { errors: [], rowErrors: {}, warnings: [], sizes: null, forcedDefense: [] };
@@ -340,7 +354,7 @@
 
     if (sz.max > cap) {
       var hint = T < 4 ? ' ' + (T + 1) + ' takım daha uygun olabilir.' : '';
-      res.warnings.push('Takım başına ' + sz.max + ' kişi düşüyor. ' + cap + ' kişiyi aşanlar yedek olur.' + hint);
+      res.warnings.push((T === 1 ? 'Takımda ' + sz.max + ' kişi var. ' : 'Takım başına ' + sz.max + ' kişi düşüyor. ') + cap + ' kişiyi aşanlar yedek olur.' + hint);
     }
 
     teamSizes.forEach(function (n, t) { if (n > FRONT_SIZE) res.forcedDefense.push(t); });
@@ -349,12 +363,16 @@
 
   /* ---------- Açıklama planı ---------- */
 
-  function isFullyLocked(p) { return p.lockTeam != null && p.lockPos != null; }
+  /* Çevrilecek hiçbir şeyi kalmayan oyuncu. Tek takımda mevki kilidi yeterli. */
+  function isFullyLocked(p, teamCount) {
+    return (teamCount === 1 || p.lockTeam != null) && p.lockPos != null;
+  }
 
-  function buildPlan(players) {
+  function buildPlan(players, teamCount) {
+    var fixed = function (p) { return isFullyLocked(p, teamCount); };
     return {
-      preplaced: players.filter(isFullyLocked).map(function (p) { return p.id; }),
-      queue: players.filter(function (p) { return !isFullyLocked(p); }).map(function (p) { return p.id; })
+      preplaced: players.filter(fixed).map(function (p) { return p.id; }),
+      queue: players.filter(function (p) { return !fixed(p); }).map(function (p) { return p.id; })
     };
   }
 

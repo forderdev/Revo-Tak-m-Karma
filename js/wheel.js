@@ -46,7 +46,7 @@
   Wheel.prototype.refreshColors = function () {
     var cs = getComputedStyle(document.documentElement);
     var v = function (n, d) { return (cs.getPropertyValue(n) || '').trim() || d; };
-    this.colors = { fg: v('--fg', '#fff'), bg: v('--bg', '#000'), alt: v('--alt', '#6f6f6f') };
+    this.colors = { fg: v('--fg', '#fff'), bg: v('--bg', '#242424'), alt: v('--alt', '#7d7d7d') };
     this.draw();
   };
 

@@ -71,7 +71,7 @@
         if (Array.isArray(raw.players)) s.players = raw.players.map(cleanPlayer).filter(Boolean);
         if (raw.settings) {
           var st = raw.settings;
-          if ([2, 3, 4].indexOf(st.teamCount) >= 0) s.settings.teamCount = st.teamCount;
+          if ([1, 2, 3, 4].indexOf(st.teamCount) >= 0) s.settings.teamCount = st.teamCount;
           if (st.mode === 'sequential') s.settings.mode = 'sequential';
           s.settings.humanKeeper = st.humanKeeper !== false;
           s.settings.defenseOpen = st.defenseOpen === true;
@@ -251,7 +251,7 @@
       '<span class="p-idx">' + (i + 1) + '</span>' +
       '<span class="p-namecell"><input class="p-name" data-f="name" value="' + esc(p.name) + '" maxlength="24" spellcheck="false" aria-label="' + (i + 1) + '. oyuncunun adı">' +
       (p.src === 'kick' ? '<span class="src" title="Kick sohbetinden katıldı">Kick</span>' : '') + '</span>' +
-      '<select class="lock lock-team' + (p.lockTeam != null ? ' is-locked' : '') + '" data-f="team" aria-label="' + esc(p.name) + ' için takım">' + teamOpts + '</select>' +
+      (T === 1 ? '' : '<select class="lock lock-team' + (p.lockTeam != null ? ' is-locked' : '') + '" data-f="team" aria-label="' + esc(p.name) + ' için takım">' + teamOpts + '</select>') +
       '<select class="lock lock-pos' + (p.lockPos ? ' is-locked' : '') + '" data-f="pos" aria-label="' + esc(p.name) + ' için mevki">' + posOpts + '</select>' +
       '<button class="p-remove" type="button" data-f="remove" aria-label="' + esc(p.name) + ' listeden çıkar" title="Listeden çıkar"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
       (err ? '<p class="p-error">' + esc(err) + '</p>' : '') +
@@ -395,6 +395,8 @@
 
     setSeg('teamCount', T);
     setSeg('mode', s.mode);
+    $('setup').dataset.teams = T;
+    $('modeGroup').hidden = T === 1;
     setSeg('speed', state.speed);
     renderTeamNames();
 
@@ -411,7 +413,7 @@
     dsw.disabled = allForced;
     dsw.setAttribute('aria-checked', String(allForced ? true : s.defenseOpen));
     var help;
-    if (allForced) help = 'Takımlar 6 kişiyi geçtiği için defans zaten doluyor. Önce orta saha ve hücum, sonra ' + (s.humanKeeper ? 'kale ve ' : '') + 'defans dolar.';
+    if (allForced) help = (T === 1 ? 'Takım' : 'Takımlar') + ' 6 kişiyi geçtiği için defans zaten doluyor. Önce orta saha ve hücum, sonra ' + (s.humanKeeper ? 'kale ve ' : '') + 'defans dolar.';
     else if (s.defenseOpen) help = 'Herkes ' + (s.humanKeeper ? 'kale dahil ' : '') + 'bütün mevkilere düşebilir.';
     else help = 'Kapalıyken 6 kişiye kadar olan takımlar sadece orta saha ve hücuma dağılır.';
     if (forced.length && !allForced) help += ' ' + forced[0] + ' kişilik takımda defans her durumda dolar.';
@@ -421,7 +423,9 @@
 
     if (N >= T) {
       var uniq = sizes.slice().sort(function (a, b) { return b - a; });
-      $('summary').textContent = N + ' oyuncu, ' + T + ' takım: ' + joinTr(uniq.map(String)) + ' kişi';
+      $('summary').textContent = T === 1
+        ? N + ' oyuncu, tek takım. Sadece mevki çarkı döner.'
+        : N + ' oyuncu, ' + T + ' takım: ' + joinTr(uniq.map(String)) + ' kişi';
     } else {
       $('summary').textContent = N ? N + ' oyuncu' : '';
     }
@@ -524,8 +528,9 @@
       showSetup();
       return;
     }
+    var single = state.settings.teamCount === 1;
     var players = state.players.map(function (p) {
-      return { id: p.id, name: p.name, lockTeam: p.lockTeam, lockPos: p.lockPos };
+      return { id: p.id, name: p.name, lockTeam: single ? null : p.lockTeam, lockPos: p.lockPos };
     });
     var settings = {
       teamCount: state.settings.teamCount,
@@ -539,7 +544,7 @@
       $('messages').innerHTML = '<li class="is-error">Bu sabitlerle dağıtım bulunamadı. Birkaç sabiti kaldır.</li>';
       return;
     }
-    var plan = D.buildPlan(players);
+    var plan = D.buildPlan(players, settings.teamCount);
     var revealed = {};
     plan.preplaced.forEach(function (id) { revealed[id] = true; });
     state.draw = {
@@ -587,7 +592,7 @@
     $('progress').hidden = false;
     buildTeams();
     wheelMode = null;
-    setTeamWheel(false);
+    idleWheel(false);
     var d = state.draw;
     if (!d.done && d.pos >= d.queue.length) {
       finish(true);
@@ -633,6 +638,7 @@
 
   function buildTeams() {
     var T = state.draw.settings.teamCount, left = [], right = [];
+    $('stage').dataset.teams = T;
     range(T).forEach(function (t) { (t % 2 === 0 ? left : right).push(t); });
     [['teamsLeft', left], ['teamsRight', right]].forEach(function (pair) {
       var el = $(pair[0]);
@@ -718,7 +724,7 @@
     if (animate && !instant) swapAnim();
   }
 
-  function setPosWheel(slots, team) {
+  function setPosWheel(slots, team, quiet) {
     var n = slots.length;
     var slices = slots.map(function (s, i) {
       var tone = i % 2 === 0 ? 'fg' : 'alt';
@@ -727,7 +733,29 @@
     });
     wheel.setSlices(slices, { hubKit: team });
     wheelMode = 'pos';
-    if (!instant) swapAnim();
+    if (!instant && !quiet) swapAnim();
+  }
+
+  function isSingle() { return state.draw.settings.teamCount === 1; }
+
+  /* Çark şu an tam bu mevkileri mi gösteriyor? */
+  function showsSlots(slots) {
+    if (wheelMode !== 'pos' || !wheel.slices || wheel.slices.length !== slots.length) return false;
+    return slots.every(function (s, i) { return wheel.slices[i].slot === s.id; });
+  }
+
+  /* Sıradaki oyuncu beklerken çarkta ne dursun. Tek takımda takım çarkı yok, mevki çarkı bekler. */
+  function idleWheel(animate) {
+    if (!isSingle()) { setTeamWheel(animate); return; }
+    var d = state.draw;
+    for (var i = d.pos; i < d.queue.length; i++) {
+      var slots = D.wheelSlotsFor(d.queue[i], d.players, d.placement, d.revealed);
+      if (slots.length) {
+        if (!showsSlots(slots)) setPosWheel(slots, 0, !animate);
+        return;
+      }
+    }
+    if (!wheel.slices || !wheel.slices.length) setTeamWheel(false);
   }
 
   function pickTeamSlice(team) {
@@ -807,7 +835,7 @@
     showName(id ? playerOf(id) : null);
     hideTokens();
     setActiveTeam(null);
-    setTeamWheel(true);
+    idleWheel(true);
     renderUpNext(d.pos + 1);
   }
 
@@ -844,6 +872,7 @@
     $('wheelZone').hidden = d.done;
     $('controls').hidden = d.done;
     $('donePanel').hidden = !d.done;
+    $('doneTitle').textContent = d.settings.teamCount === 1 ? 'Takım hazır' : 'Takımlar hazır';
     $('upNext').hidden = d.done;
     document.querySelector('#stage .now').hidden = d.done;
 
@@ -890,7 +919,9 @@
     setActiveTeam(null);
 
     var chain = Promise.resolve();
-    if (p.lockTeam == null) {
+    if (isSingle()) {
+      // Tek takım: takım belli, doğrudan mevkiye geçilir.
+    } else if (p.lockTeam == null) {
       chain = chain.then(function () {
         var swapping = wheelMode !== 'team';
         setTeamWheel(true);
@@ -922,8 +953,9 @@
       }
       var slots = D.wheelSlotsFor(id, d.players, d.placement, d.revealed);
       var idx = slots.findIndex(function (s) { return s.id === target.slot; });
-      setPosWheel(slots, target.team);
-      return pause(320).then(function () {
+      var ready = showsSlots(slots);
+      if (ready) wheel.setSlices(wheel.slices, { hubKit: wheel.hubKit }); else setPosWheel(slots, target.team);
+      return pause(ready ? 0 : 320).then(function () {
         if (!alive()) return;
         return spin(idx, sp.pos);
       }).then(function () {

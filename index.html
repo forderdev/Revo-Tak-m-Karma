@@ -47,7 +47,7 @@
         </form>
         <p class="add-note" id="addNote" role="status" aria-live="polite"></p>
         <div class="roster-cols" aria-hidden="true">
-          <span>Sıra</span><span>İsim</span><span>Takım</span><span>Mevki</span><span></span>
+          <span>Sıra</span><span>İsim</span><span class="col-team">Takım</span><span>Mevki</span><span></span>
         </div>
         <ol class="players" id="players"></ol>
         <div class="empty" id="emptyRoster">
@@ -59,6 +59,7 @@
         <div class="group">
           <h3>Takım sayısı</h3>
           <div class="seg" role="radiogroup" aria-label="Takım sayısı" id="teamCount">
+            <button type="button" role="radio" data-value="1">1</button>
             <button type="button" role="radio" data-value="2">2</button>
             <button type="button" role="radio" data-value="3">3</button>
             <button type="button" role="radio" data-value="4">4</button>
@@ -66,7 +67,7 @@
           <div class="team-names" id="teamNames"></div>
         </div>
 
-        <div class="group">
+        <div class="group" id="modeGroup">
           <h3>Takımlara dağıtım</h3>
           <div class="seg" role="radiogroup" aria-label="Takımlara dağıtım" id="mode">
             <button type="button" role="radio" data-value="random">Rastgele</button>
@@ -154,7 +155,7 @@
         </div>
 
         <div class="done" id="donePanel" hidden>
-          <p class="done-title">Takımlar hazır</p>
+          <p class="done-title" id="doneTitle">Takımlar hazır</p>
           <div class="done-actions">
             <button class="btn btn-primary" id="copyDiscord" type="button">Discord'a kopyala</button>
             <button class="btn" id="redraw" type="button">Yeniden çek</button>

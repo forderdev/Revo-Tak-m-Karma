@@ -211,3 +211,73 @@ test('discord metni', () => {
   assert.match(txt, /\*\*Kırmızılar\*\*/);
   assert.match(txt, /Oyuncu 1/);
 });
+
+/* ---------- Tek takım ---------- */
+
+test('tek takım, 5 kişi: herkes takım 0, defans kapalıyken ön grupta', () => {
+  const players = P(5), settings = S({ teamCount: 1 });
+  for (let i = 0; i < 100; i++) {
+    const pl = D.solve(players, settings);
+    assert.ok(pl);
+    players.forEach((p) => {
+      assert.equal(pl[p.id].team, 0);
+      assert.equal(group(pl[p.id].slot), 'front');
+    });
+    const slots = players.map((p) => pl[p.id].slot);
+    assert.equal(new Set(slots).size, 5);
+  }
+});
+
+test('tek takım, 8 kişi: önce ön grup, sonra kale, sonra defans', () => {
+  const players = P(8), settings = S({ teamCount: 1 });
+  for (let i = 0; i < 100; i++) {
+    const pl = D.solve(players, settings);
+    const groups = players.map((p) => group(pl[p.id].slot));
+    assert.equal(groups.filter((g) => g === 'front').length, 6);
+    assert.equal(groups.filter((g) => g === 'gk').length, 1);
+    assert.equal(groups.filter((g) => g === 'def').length, 1);
+  }
+});
+
+test('tek takım: kayıtlı takım kilitleri yok sayılır, hata çıkmaz', () => {
+  const players = P(6, { 0: { lockTeam: 3 }, 1: { lockTeam: 1, lockPos: 'SNT' } });
+  const settings = S({ teamCount: 1 });
+  const v = D.validate(players, settings);
+  assert.deepEqual(v.errors, []);
+  assert.deepEqual(v.rowErrors, {});
+  const pl = D.solve(players, settings);
+  assert.ok(pl);
+  players.forEach((p) => assert.equal(pl[p.id].team, 0));
+  assert.equal(pl.p1.slot, 'SNT');
+});
+
+test('tek takım: mevkisi kilitli olan baştan yerleşir, gerisi sırada bekler', () => {
+  const players = P(4, { 2: { lockPos: 'MOO' }, 3: { lockTeam: 0 } });
+  const plan = D.buildPlan(players, 1);
+  assert.deepEqual(plan.preplaced, ['p2']);
+  assert.deepEqual(plan.queue, ['p0', 'p1', 'p3']);
+  // Çok takımlıda sadece mevki kilidi yetmez.
+  assert.deepEqual(D.buildPlan(players, 2).preplaced, []);
+});
+
+test('tek takım, 14 kişi: 11 sahada, listede son 3 yedek ve uyarı', () => {
+  const players = P(14), settings = S({ teamCount: 1 });
+  const v = D.validate(players, settings);
+  assert.deepEqual(v.errors, []);
+  assert.match(v.warnings[0], /^Takımda 14 kişi var\. 11 kişiyi aşanlar yedek olur\. 2 takım/);
+  const pl = D.solve(players, settings);
+  assert.deepEqual(['p11', 'p12', 'p13'].map((id) => pl[id].slot), [D.BENCH, D.BENCH, D.BENCH]);
+  assert.equal(players.filter((p) => pl[p.id].slot !== D.BENCH).length, 11);
+});
+
+test('tek takım, mevki çarkı: açıklanan ve kilitli yerler çarkta görünmez', () => {
+  const players = P(6, { 5: { lockPos: 'SNT' } });
+  const settings = S({ teamCount: 1 });
+  const pl = D.solve(players, settings);
+  const revealed = { p5: true, p0: true };
+  const ids = D.wheelSlotsFor('p1', players, pl, revealed).map((s) => s.id);
+  assert.equal(ids.length, 4);
+  assert.ok(!ids.includes('SNT'));
+  assert.ok(!ids.includes(pl.p0.slot));
+  assert.ok(ids.includes(pl.p1.slot));
+});
