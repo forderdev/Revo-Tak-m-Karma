@@ -1,0 +1,17 @@
+name = "takim-karma-kick"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+[vars]
+# İstersen sadece kendi kanalına izin ver: "revo" ya da "revo,baskakanal"
+ALLOWED_CHANNELS = ""
+# İstersen sadece kendi siten bağlanabilsin: "https://kullaniciadi.github.io"
+ALLOWED_ORIGINS = ""
+
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatRoom"]
